@@ -2,13 +2,14 @@ require 'sinatra/base'
 require 'json'
 require 'net/http'
 require 'uri'
-require 'cgi'
+require 'webrick'
 
 class StockApp < Sinatra::Base
   configure do
     set :bind, '0.0.0.0'
     set :port, ENV.fetch('PORT', 3000)
     set :public_folder, File.dirname(__FILE__)
+    set :server, :webrick
   end
 
   YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/'.freeze
@@ -120,6 +121,9 @@ class StockApp < Sinatra::Base
   get '/' do
     send_file File.join(settings.public_folder, 'index.html')
   end
+end
 
-  run! if app_file == $0
+# Run the server
+if __FILE__ == $0
+  StockApp.run!
 end
