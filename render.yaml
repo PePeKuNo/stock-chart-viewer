@@ -2,8 +2,8 @@ services:
   - type: web
     name: stock-chart-viewer
     runtime: ruby
-    buildCommand: "sh -c 'bundle config set frozen false && bundle install'"
-    startCommand: "ruby app.rb"
+    buildCommand: "bundle config set frozen false && bundle install"
+    startCommand: "bundle exec ruby app.rb"
     envVars:
       - key: PORT
         value: "3000"
