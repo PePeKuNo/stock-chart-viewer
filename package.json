@@ -1,0 +1,19 @@
+{
+  "name": "stock-chart-viewer",
+  "version": "1.0.0",
+  "description": "Simple one-page stock chart viewer with autocomplete and interactive charts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "stock",
+    "chart",
+    "finance",
+    "yahoo-finance"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Chart Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            padding: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: end;
+            border-bottom: 1px solid #eee;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .control-group select:focus,
+        .control-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .ts-control {
+            border-radius: 8px !important;
+            border: 1px solid #ddd !important;
+            min-height: 46px !important;
+        }
+
+        .ts-control:focus-within {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+        }
+
+        .chart-container {
+            padding: 1.5rem;
+            position: relative;
+            height: 500px;
+        }
+
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 400px;
+                padding: 1rem;
+            }
+            
+            .controls {
+                padding: 1rem;
+            }
+            
+            header h1 {
+                font-size: 1.25rem;
+            }
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .loading::after {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 3px solid #eee;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.75rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #e74c3c;
+            font-size: 1rem;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .price-info {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            padding: 1rem 1.5rem;
+            background: #fafafa;
+            border-top: 1px solid #eee;
+            flex-wrap: wrap;
+        }
+
+        .price-item {
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 0.75rem;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .price-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .price-value.positive { color: #27ae60; }
+        .price-value.negative { color: #e74c3c; }
+
+        @media (max-width: 480px) {
+            .price-info {
+                gap: 1rem;
+            }
+            .price-value {
+                font-size: 1rem;
+            }
+        }
+
+        .btn-refresh {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap;
+        }
+
+        .btn-refresh:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-refresh:active {
+            transform: scale(0.98);
+        }
+
+        .btn-refresh:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📈 Stock Chart Viewer</h1>
+        </header>
+        
+        <div class="controls">
+            <div class="control-group" style="flex: 2; min-width: 250px;">
+                <label for="stock-select">Select Stock</label>
+                <select id="stock-select" placeholder="Search for a stock (e.g., AAPL, GOOGL, TSLA)..."></select>
+            </div>
+            
+            <div class="control-group">
+                <label for="timeframe">Time Range</label>
+                <select id="timeframe">
+                    <option value="1d">1 Day</option>
+                    <option value="5d">5 Days</option>
+                    <option value="1wk" selected>1 Week</option>
+                    <option value="1mo">1 Month</option>
+                    <option value="3mo">3 Months</option>
+                    <option value="1y">1 Year</option>
+                    <option value="5y">5 Years</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="interval">Interval</label>
+                <select id="interval">
+                    <option value="1m">1 Minute</option>
+                    <option value="5m">5 Minutes</option>
+                    <option value="15m">15 Minutes</option>
+                    <option value="30m">30 Minutes</option>
+                    <option value="1h" selected>1 Hour</option>
+                    <option value="1d">1 Day</option>
+                    <option value="1wk">1 Week</option>
+                    <option value="1mo">1 Month</option>
+                </select>
+            </div>
+            
+            <div class="control-group" style="flex: 0 0 auto;">
+                <label>&nbsp;</label>
+                <button class="btn-refresh" id="refresh-btn" onclick="loadChart()">🔄 Refresh</button>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="stock-chart"></canvas>
+            <div class="loading" id="loading" style="display: none;">Loading chart data...</div>
+            <div class="error" id="error" style="display: none;"></div>
+        </div>
+        
+        <div class="price-info" id="price-info" style="display: none;">
+            <div class="price-item">
+                <div class="price-label">Current Price</div>
+                <div class="price-value" id="current-price">-</div>
+            </div>
+            <div class="price-item">
+                <div class="price-label">Change</div>
+                <div class="price-value" id="price-change">-</div>
+            </div>
+            <div class="price-item">
+                <div class="price-label">Change %</div>
+                <div class="price-value" id="price-change-pct">-</div>
+            </div>
+            <div class="price-item">
+                <div class="price-label">Volume</div>
+                <div class="price-value" id="volume">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Popular stocks for autocomplete
+        const popularStocks = [
+            { symbol: 'AAPL', name: 'Apple Inc.' },
+            { symbol: 'MSFT', name: 'Microsoft Corporation' },
+            { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+            { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+            { symbol: 'TSLA', name: 'Tesla Inc.' },
+            { symbol: 'META', name: 'Meta Platforms Inc.' },
+            { symbol: 'NVDA', name: 'NVIDIA Corporation' },
+            { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
+            { symbol: 'V', name: 'Visa Inc.' },
+            { symbol: 'WMT', name: 'Walmart Inc.' },
+            { symbol: 'JNJ', name: 'Johnson & Johnson' },
+            { symbol: 'MA', name: 'Mastercard Inc.' },
+            { symbol: 'PG', name: 'Procter & Gamble Co.' },
+            { symbol: 'UNH', name: 'UnitedHealth Group' },
+            { symbol: 'HD', name: 'Home Depot Inc.' },
+            { symbol: 'DIS', name: 'Walt Disney Co.' },
+            { symbol: 'PYPL', name: 'PayPal Holdings Inc.' },
+            { symbol: 'NFLX', name: 'Netflix Inc.' },
+            { symbol: 'ADBE', name: 'Adobe Inc.' },
+            { symbol: 'CRM', name: 'Salesforce Inc.' },
+            { symbol: 'INTC', name: 'Intel Corporation' },
+            { symbol: 'AMD', name: 'Advanced Micro Devices' },
+            { symbol: 'BABA', name: 'Alibaba Group' },
+            { symbol: 'KO', name: 'Coca-Cola Co.' },
+            { symbol: 'PEP', name: 'PepsiCo Inc.' },
+            { symbol: 'CSCO', name: 'Cisco Systems Inc.' },
+            { symbol: 'PFE', name: 'Pfizer Inc.' },
+            { symbol: 'T', name: 'AT&T Inc.' },
+            { symbol: 'VZ', name: 'Verizon Communications' },
+            { symbol: 'ABT', name: 'Abbott Laboratories' },
+            { symbol: 'COST', name: 'Costco Wholesale' },
+            { symbol: 'NKE', name: 'Nike Inc.' },
+            { symbol: 'MRK', name: 'Merck & Co.' },
+            { symbol: 'TMO', name: 'Thermo Fisher Scientific' },
+            { symbol: 'AVGO', name: 'Broadcom Inc.' },
+            { symbol: 'ACN', name: 'Accenture plc' },
+            { symbol: 'TXN', name: 'Texas Instruments' },
+            { symbol: 'QCOM', name: 'QUALCOMM Inc.' },
+            { symbol: 'LLY', name: 'Eli Lilly and Company' },
+            { symbol: 'MDT', name: 'Medtronic plc' },
+            { symbol: 'HON', name: 'Honeywell International' },
+            { symbol: 'UPS', name: 'United Parcel Service' },
+            { symbol: 'LOW', name: "Lowe's Companies" },
+            { symbol: 'SBUX', name: 'Starbucks Corporation' },
+            { symbol: 'AMGN', name: 'Amgen Inc.' },
+            { symbol: 'CVX', name: 'Chevron Corporation' },
+            { symbol: 'XOM', name: 'Exxon Mobil Corporation' },
+            { symbol: 'IBM', name: 'International Business Machines' },
+            { symbol: 'CAT', name: 'Caterpillar Inc.' },
+            { symbol: 'GE', name: 'General Electric Co.' },
+            { symbol: 'GS', name: 'Goldman Sachs Group' },
+            { symbol: 'BA', name: 'Boeing Co.' }
+        ];
+
+        let chart = null;
+        let currentSymbol = 'AAPL';
+
+        // Initialize Tom Select for autocomplete
+        document.addEventListener('DOMContentLoaded', function() {
+            const select = document.getElementById('stock-select');
+            
+            new TomSelect(select, {
+                options: popularStocks.map(s => ({ value: s.symbol, text: s.symbol, name: s.name })),
+                valueField: 'value',
+                labelField: 'text',
+                searchField: ['text', 'name'],
+                create: false,
+                render: {
+                    option: function(data, escape) {
+                        return '<div><strong>' + escape(data.text) + '</strong> - ' + escape(data.name) + '</div>';
+                    },
+                    item: function(data, escape) {
+                        return '<div><strong>' + escape(data.text) + '</strong></div>';
+                    }
+                },
+                onChange: function(value) {
+                    if (value) {
+                        currentSymbol = value;
+                        loadChart();
+                    }
+                },
+                placeholder: 'Search for a stock (e.g., AAPL, GOOGL, TSLA)...',
+                maxOptions: 20,
+                dropdownParent: 'body'
+            });
+            
+            // Set default value
+            select.tomselect.setValue('AAPL');
+            loadChart();
+        });
+
+        function getIntervalForTimeframe(timeframe) {
+            const interval = document.getElementById('interval').value;
+            
+            // Auto-adjust interval based on timeframe for better UX
+            const autoIntervals = {
+                '1d': '5m',
+                '5d': '30m',
+                '1wk': '1h',
+                '1mo': '1d',
+                '3mo': '1d',
+                '1y': '1d',
+                '5y': '1wk'
+            };
+            
+            // If user hasn't manually changed interval, use auto
+            return interval || autoIntervals[timeframe] || '1d';
+        }
+
+        async function fetchStockData(symbol, timeframe, interval) {
+            const url = `/api/stock?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&interval=${encodeURIComponent(interval)}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to fetch data' }));
+                throw new Error(error.error || 'Failed to fetch stock data');
+            }
+            
+            return response.json();
+        }
+
+        function formatVolume(volume) {
+            if (volume >= 1e9) return (volume / 1e9).toFixed(2) + 'B';
+            if (volume >= 1e6) return (volume / 1e6).toFixed(2) + 'M';
+            if (volume >= 1e3) return (volume / 1e3).toFixed(2) + 'K';
+            return volume.toString();
+        }
+
+        function formatPrice(price) {
+            return '$' + price.toFixed(2);
+        }
+
+        function updatePriceInfo(data) {
+            if (!data || !data.prices || data.prices.length === 0) return;
+            
+            const latest = data.prices[data.prices.length - 1];
+            const previous = data.prices.length > 1 ? data.prices[data.prices.length - 2] : latest;
+            
+            const change = latest.close - previous.close;
+            const changePct = ((change / previous.close) * 100).toFixed(2);
+            
+            document.getElementById('current-price').textContent = formatPrice(latest.close);
+            document.getElementById('price-change').textContent = (change >= 0 ? '+' : '') + formatPrice(change);
+            document.getElementById('price-change').className = 'price-value ' + (change >= 0 ? 'positive' : 'negative');
+            document.getElementById('price-change-pct').textContent = (change >= 0 ? '+' : '') + changePct + '%';
+            document.getElementById('price-change-pct').className = 'price-value ' + (change >= 0 ? 'positive' : 'negative');
+            document.getElementById('volume').textContent = formatVolume(latest.volume);
+            
+            document.getElementById('price-info').style.display = 'flex';
+        }
+
+        function createChart(data) {
+            const ctx = document.getElementById('stock-chart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            const labels = data.prices.map(p => new Date(p.timestamp));
+            const prices = data.prices.map(p => p.close);
+            const volumes = data.prices.map(p => p.volume);
+            
+            const isIntraday = data.timeframe === '1d' || data.timeframe === '5d';
+            const timeFormat = isIntraday ? 'MMM d, HH:mm' : 'MMM d, yyyy';
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: data.symbol + ' Price',
+                        data: prices,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#667eea',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            callbacks: {
+                                title: function(context) {
+                                    const date = new Date(context[0].parsed.x);
+                                    return date.toLocaleString(undefined, { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        year: isIntraday ? 'numeric' : undefined,
+                                        hour: isIntraday ? '2-digit' : undefined,
+                                        minute: isIntraday ? '2-digit' : undefined
+                                    });
+                                },
+                                label: function(context) {
+                                    return data.symbol + ': $' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                                modifierKey: 'ctrl'
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    modifierKey: 'ctrl'
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    minute: 'HH:mm',
+                                    hour: 'HH:mm',
+                                    day: 'MMM d',
+                                    week: 'MMM d',
+                                    month: 'MMM yyyy'
+                                }
+                            },
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxTicksLimit: 8,
+                                font: { size: 11 }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2);
+                                },
+                                font: { size: 11 }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 750,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        async function loadChart() {
+            const timeframe = document.getElementById('timeframe').value;
+            const interval = getIntervalForTimeframe(timeframe);
+            
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const chartEl = document.getElementById('stock-chart');
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            loadingEl.style.display = 'flex';
+            errorEl.style.display = 'none';
+            chartEl.style.display = 'none';
+            refreshBtn.disabled = true;
+            
+            try {
+                const data = await fetchStockData(currentSymbol, timeframe, interval);
+                createChart(data);
+                updatePriceInfo(data);
+                
+                loadingEl.style.display = 'none';
+                chartEl.style.display = 'block';
+            } catch (err) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'flex';
+                errorEl.textContent = err.message;
+                chartEl.style.display = 'none';
+                document.getElementById('price-info').style.display = 'none';
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Handle interval change
+        document.getElementById('interval').addEventListener('change', loadChart);
+        document.getElementById('timeframe').addEventListener('change', loadChart);
+
+        // Handle orientation change on mobile
+        window.addEventListener('orientationchange', function() {
+            setTimeout(() => {
+                if (chart) chart.resize();
+            }, 100);
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (chart) chart.resize();
+        });
+    </script>
+</body>
+</html>
