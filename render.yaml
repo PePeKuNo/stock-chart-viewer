@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: stock-chart-viewer
+    runtime: ruby
+    buildCommand: "bundle install"
+    startCommand: "ruby app.rb"
+    envVars:
+      - key: PORT
+        value: "3000"
